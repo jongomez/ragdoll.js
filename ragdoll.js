@@ -195,7 +195,7 @@ function Ragdoll(skeleton, mesh, config, jointCollisions = false, showBoxes = fa
 
     this.ragdollOff = function() {
         this.ragdollMode = false;
-        this.mesh.position.y = 0;
+        this.mesh.position = new BABYLON.Vector3();
     }
 
     this.init = function() {
