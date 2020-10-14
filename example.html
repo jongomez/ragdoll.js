@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>RagdollJS example</title>
+  <style>
+    html,
+    body {
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    #renderCanvas {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+  </style>
+
+  <script src="external/cannon.js"></script>
+  <script src="external/oimo.js"></script>
+  <script src="external/ammo.js"></script>
+  <script src="external/babylon.max.js"></script>
+  <script src="external/babylonjs.loaders.min.js"></script>
+  <script src="external/babylon.inspector.bundle.js"></script>
+  <script src="external/babylon.gui.js"></script>
+  <script src="external/CharacterController.max.js"></script>
+  <script src="ragdoll.js"></script>
+</head>
+
+<body>
+  <canvas id="renderCanvas"></canvas>
+  <script>
+    window.onload = function () {
+      main();
+    };
+
+    var floorBox, player, ragdoll, config, cc, cloneRagdoll;
+    function main() {
+      BABYLON.Animation.AllowMatricesInterpolation = true;
+
+      var canvas = document.querySelector("#renderCanvas");
+      var engine = new BABYLON.Engine(canvas, true);
+      var scene = new BABYLON.Scene(engine);
+      
+
+      //
+      ////
+      ////// Physics engine stuff! Works best with Oimo (Oimo supports min and max configs for some joints... not sure if other engines have this).
+
+      const gravity = -9;
+      //scene.enablePhysics(new BABYLON.Vector3(0, gravity, 0), new BABYLON.AmmoJSPlugin());
+      //scene.enablePhysics(new BABYLON.Vector3(0, gravity, 0), new BABYLON.CannonJSPlugin());
+      scene.enablePhysics(new BABYLON.Vector3(0, gravity, 0), new BABYLON.OimoJSPlugin());
+
+      scene.clearColor = new BABYLON.Color3(0.75, 0.75, 0.75);
+      scene.ambientColor = new BABYLON.Color3(1, 1, 1);
+      scene.debugLayer.show({ showExplorer: true, embedMode: true });
+
+      var light = new BABYLON.HemisphericLight("light1", new BABYLON.Vector3(0, 1, 0), scene);
+      light.intensity = 0.3;
+
+      var light2 = new BABYLON.DirectionalLight("light2", new BABYLON.Vector3(-1, -1, -1), scene);
+      light2.position = new BABYLON.Vector3(0, 128, 0);
+      light2.intensity = 0.7;
+
+      function createFloor(scene, width, height, depth) {
+        let floorBox = BABYLON.MeshBuilder.CreateBox("FLOOR", { height: height, width: width, depth: depth }, scene);
+        floorBox.position.y = -depth / 2;
+        floorBox.rotation.x = Math.PI / 2;
+        floorBox.checkCollisions = true;
+        floorBox.physicsImpostor = new BABYLON.PhysicsImpostor(floorBox, BABYLON.PhysicsImpostor.BoxImpostor, { mass: 0, restitution: 0 }, scene);
+      }
+
+      createFloor(scene, 100, 100, 10);
+      loadPlayer(scene, engine, canvas);
+
+      var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("aaas", true, scene);
+      var text1 = new BABYLON.GUI.TextBlock();
+      text1.text = "Control the character with 'wasd', 'space'. Hold 'shift' to run. Press 'r' to toggle ragdoll mode, 'm' to add ragdolls.";
+      text1.color = "white";
+      text1.fontSize = 30;
+      text1.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP;
+      advancedTexture.addControl(text1);
+
+      window.addEventListener("resize", function () {
+        engine.resize();
+      });
+    }
+
+    function loadPlayer(scene, engine, canvas) {
+      BABYLON.SceneLoader.ImportMesh("", "model/", "Vita1.babylon", scene, (meshes, particleSystems, skeletons) => {
+        // Disable frustum culling.
+        meshes[0].alwaysSelectAsActiveMesh = true;
+
+        player = meshes[0];
+        var skeleton = skeletons[0];
+        player.skeleton = skeleton;
+        player.position = new BABYLON.Vector3(0, 2, -3);
+
+        skeleton.enableBlending(0.1);
+        //if the skeleton does not have any animation ranges then set them as below
+        // setAnimationRanges(skeleton);
+
+        //
+        ////
+        ////// Ragdoll stuff.
+
+        config = [{ bones: ["rShldr", "lShldr"], size: 0.1, rotationAxis: BABYLON.Axis.Z },
+        { bones: ["rForeArm", "lForeArm"], size: 0.1 },
+        { bones: ["hip"], width: 0.15, depth: 0.15, height: 0.25},
+        { bones: ["rThigh", "lThigh"], width: 0.1, depth: 0.1, height: 0.3, rotationAxis: BABYLON.Axis.Z },
+        { bones: ["rShin", "lShin"], width: 0.1, depth: 0.1, height: 0.3},
+        { bones: ["rFoot", "lFoot"], size: 0.1 },
+        { bones: ["head"], size: 0.15, min: -30, max: 30, rotationAxis: BABYLON.Axis.Z },
+          //{bones: ["rHand", "lHand"], width: 0.1, depth: 0.1}, 
+          //{bones: ["chest", "abdominal", "hip"], width: 0.2, depth: 0.2, rotationAxis: BABYLON.Axis.Y}, 
+          //{bones: ["neck"], width: 0.1, depth: 0.1},
+          //{bones: ["rCollar", "lCollar", "J_Bip_C_UpperChest"], width: 0.1, depth: 0.1, height: 0.1}
+        ]
+
+        const jointCollisions = false;
+        const showBoxes = true;
+        const mainPivotSphereSize = 0;
+        const disableBoxBoneSync = false;
+        ragdoll = new Ragdoll(skeleton, player, config, jointCollisions, showBoxes, mainPivotSphereSize, disableBoxBoneSync);
+        ragdoll.putBoxesInBoneCenter = true;
+
+        // For debugging the box config:
+        // ragdoll.disableBoxBoneSync = true;
+        // ragdoll.mass = 0;
+        
+        ragdoll.init();
+
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "r" || event.key === "R") {
+            if (ragdoll.ragdollMode && cc != undefined) {
+              cc.resumeAnim();
+              cc.start();
+              cc.idle(true);
+              ragdoll.ragdollOff();
+            } else if(cc != undefined) {
+              cc.pauseAnim();
+              cc.stop();
+              scene.stopAnimation(ragdoll.skeleton);
+              ragdoll.ragdoll();
+            }
+          }
+
+          if (event.key === "m" || event.key === "M") {
+            let myMeshClone = player.clone("clonedMesh");
+            let mySkeletonClone = player.skeleton.clone("clonedSkeleton");
+
+            myMeshClone.skeleton = mySkeletonClone
+            myMeshClone.position = new BABYLON.Vector3(0, 3, 0)
+
+            // skeleton clone doesn't have bone lengths :(
+            for (let i = 0; i < mySkeletonClone.bones.length; i++) {
+              mySkeletonClone.bones[i].length = player.skeleton.bones[i].length;
+            }
+
+            const jointCollisions = false;
+            const showBoxes = true;
+            const mainPivotSphereSize = 0;
+            const disableBoxBoneSync = false;
+            cloneRagdoll = new Ragdoll(mySkeletonClone, myMeshClone, config, jointCollisions, showBoxes, mainPivotSphereSize, disableBoxBoneSync);
+            cloneRagdoll.init();
+            cloneRagdoll.ragdoll();
+          }
+        });
+
+
+        //
+        ////
+        ////// Camera stuff
+
+        //rotate the camera behind the player
+        //player.rotation.y = Math.PI / 4;
+        var alpha = -(Math.PI / 2 + player.rotation.y);
+        var beta = Math.PI / 2.5;
+        //var target = new BABYLON.Vector3(player.position.x, player.position.y + 1.5, player.position.z);
+        var target = new BABYLON.Vector3(player.position.x, player.position.y + 2.5, player.position.z - 4);
+        var camera = new BABYLON.ArcRotateCamera("ArcRotateCamera", alpha, beta, 5, target, scene);
+
+        //standard camera setting
+        camera.wheelPrecision = 15;
+        camera.checkCollisions = false;
+
+        //how close can the camera come to player
+        camera.lowerRadiusLimit = 2;
+        //how far can the camera go from the player
+        camera.upperRadiusLimit = 20;
+        camera.attachControl(canvas, false);
+
+        //
+        ////
+        ////// Character controller stuff.
+        const enableCharacterController = true;
+        if (enableCharacterController) {
+          player.ellipsoid = new BABYLON.Vector3(0.5, 1, 0.5);
+          player.ellipsoidOffset = new BABYLON.Vector3(0, 1, 0);
+          player.checkCollisions = true;
+
+          cc = new CharacterController(player, camera, scene);
+          //cc.setFaceForward(true);
+          //cc.setMode(0);
+          cc.setMode(1);
+
+          //below makes the controller point the camera at the player head which is approx
+          //1.5m above the player origin
+          cc.setCameraTarget(new BABYLON.Vector3(0, 1.5, 0));
+
+          //if the camera comes close to the player we want to enter first person mode.
+          // (doesn't work?!?!)
+          cc.setNoFirstPerson(false);
+          // Don't move the camera if something appears between camera and character.
+          cc.setCameraElasticity(false);
+
+          //the height of steps which the player can climb
+          cc.setStepOffset(0.4);
+          //the minimum and maximum slope the player can go up
+          //between the two the player will start sliding down if it stops
+          cc.setSlopeLimit(30, 60);
+
+          // tell controller
+          // - which animation range should be used for which player animation
+          // - rate at which to play that animation range
+          // - wether the animation range should be looped
+          // use this if name, rate or looping is different from default
+          cc.setIdleAnim("idle", 1, true);
+          cc.setTurnLeftAnim("turnLeft", 0.5, true);
+          cc.setTurnRightAnim("turnRight", 0.5, true);
+          cc.setWalkBackAnim("walkBack", 0.5, true);
+          cc.setIdleJumpAnim("idleJump", 0.5, false);
+          cc.setRunJumpAnim("runJump", 0.6, false);
+          cc.setFallAnim("fall", 2, false);
+          cc.setSlideBackAnim("slideBack", 1, false);
+
+          cc.start();
+          cc.idle();
+        }
+
+        engine.runRenderLoop(function () {
+          scene.render();
+        });
+      });
+    }
+
+  </script>
+</body>
+</html>
