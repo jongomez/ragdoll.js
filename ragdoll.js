@@ -1,35 +1,33 @@
-class Ragdoll {
-    constructor(skeleton, mesh, config, jointCollisions = false, showBoxes = false, mainPivotSphereSize = 0, disableBoxBoneSync = false) {
-        this.skeleton = skeleton;
-        this.scene = skeleton.getScene();
-        this.mesh = mesh;
-        this.config = config; // initial, user defined box configs. May have several box configs jammed into 1 index.
-        this.boxConfigs = []; // final box configs. Every element is a separate box config (this.config may have several configs jammed into 1 index).
-        this.showBoxes = showBoxes; // show the collider boxes, aka impostor boxes.
-        this.boxVisibility = 0.6; // when showBoxes is true, what is the box visibility, i.e. how transparent they are.
-        this.bones = [];
-        this.initialRotation = [];
-        this.boneNames = [];
-        this.boxes = []; // collider boxes meshes, aka impostor boxes.
-        this.impostors = []; // physicsImpostors for the boxes. Probably useless, because this.impostors[i] == this.boxes[i].physicsImpostor.
-        this.mainPivotSphereSize = mainPivotSphereSize; // used for debugging. Show the main pivot points for the joints.
-        this.disableBoxBoneSync = disableBoxBoneSync; // when not in ragdoll mode, the boxes will, by default, follow the bones. If you don't want that, set this to true.
-        this.ragdollMode = false;
-        this.jointCollisions = jointCollisions;
-        this.rootBoneName;
-        this.rootBoneIndex = -1;
-        this.mass = 1;
-        this.restitution = 0;
+function Ragdoll(skeleton, mesh, config, jointCollisions = false, showBoxes = false, mainPivotSphereSize = 0, disableBoxBoneSync = false) {
+    this.skeleton = skeleton;
+    this.scene = skeleton.getScene();
+    this.mesh = mesh;
+    this.config = config; // initial, user defined box configs. May have several box configs jammed into 1 index.
+    this.boxConfigs = []; // final box configs. Every element is a separate box config (this.config may have several configs jammed into 1 index).
+    this.showBoxes = showBoxes; // show the collider boxes, aka impostor boxes.
+    this.boxVisibility = 0.6; // when showBoxes is true, what is the box visibility, i.e. how transparent they are.
+    this.bones = [];
+    this.initialRotation = [];
+    this.boneNames = [];
+    this.boxes = []; // collider boxes meshes, aka impostor boxes.
+    this.impostors = []; // physicsImpostors for the boxes. Probably useless, because this.impostors[i] == this.boxes[i].physicsImpostor.
+    this.mainPivotSphereSize = mainPivotSphereSize; // used for debugging. Show the main pivot points for the joints.
+    this.disableBoxBoneSync = disableBoxBoneSync; // when not in ragdoll mode, the boxes will, by default, follow the bones. If you don't want that, set this to true.
+    this.ragdollMode = false;
+    this.jointCollisions = jointCollisions;
+    this.rootBoneName;
+    this.rootBoneIndex = -1;
+    this.mass = 1;
+    this.restitution = 0;
 
-        this.putBoxesInBoneCenter = false;
-        this.defaultJoint = BABYLON.PhysicsJoint.HingeJoint;
-        this.defaultJointMin = -90;
-        this.defaultJointMax = 90;
+    this.putBoxesInBoneCenter = false;
+    this.defaultJoint = BABYLON.PhysicsJoint.HingeJoint;
+    this.defaultJointMin = -90;
+    this.defaultJointMax = 90;
 
-        this.boneOffsetAxis = BABYLON.Axis.Y;
-    }
+    this.boneOffsetAxis = BABYLON.Axis.Y;
  
-    createColliders() {
+    this.createColliders = function() {
         this.mesh.computeWorldMatrix();
 
         for (let i = 0; i < this.config.length; i++) {
@@ -95,7 +93,7 @@ class Ragdoll {
         }
     }
 
-    initJoints() {
+    this.initJoints = function() {
         this.mesh.computeWorldMatrix();
         for (let i = 0; i < this.bones.length; i++) {
             // The root bone has no joints.
@@ -144,13 +142,13 @@ class Ragdoll {
         }
     }
 
-    addImpostorRotationToBone(boneIndex) {
+    this.addImpostorRotationToBone = function(boneIndex) {
         const newRotQuat = this.impostors[boneIndex].object.rotationQuaternion.multiply(this.initialRotation[boneIndex]);
         this.bones[boneIndex].setRotationQuaternion(newRotQuat, BABYLON.Space.WORLD, this.mesh);
     }
 
     // Return true if root bone is valid/exists in this.bonesNames. false otherwise.
-    defineRootBone() {
+    this.defineRootBone = function() {
         const skeletonRoots = this.skeleton.getChildren();
         if (skeletonRoots.length != 1) {
             console.log("Ragdoll creation failed: there can only be 1 root in the skeleton :(");
@@ -167,7 +165,7 @@ class Ragdoll {
         return true;
     }
 
-    findNearestParent(boneIndex) {
+    this.findNearestParent = function(boneIndex) {
         let nearestParent = this.bones[boneIndex].getParent();
 
         do {
@@ -183,7 +181,7 @@ class Ragdoll {
         return nearestParent;
     }
 
-    toggleShowBoxes() {
+    this.toggleShowBoxes = function() {
         this.showBoxes = !this.showBoxes;
 
         for(let box of this.boxes) {
@@ -191,16 +189,16 @@ class Ragdoll {
         }
     }
 
-    dispose() {
+    this.dispose = function() {
         // TODO:
     }
 
-    ragdollOff() {
+    this.ragdollOff = function() {
         this.ragdollMode = false;
         this.mesh.position.y = 0;
     }
 
-    init() {
+    this.init = function() {
         this.createColliders();
         
         // If this.defineRootBone() returns false... there is not root bone.
@@ -247,7 +245,7 @@ class Ragdoll {
         this.scene.registerBeforeRender(this.syncBonesAndBoxes);
     }
 
-    ragdoll() {
+    this.ragdoll = function() {
         // HACK!!! Right before ragdoll mode is activated, we will use rotationAdjust to undo the initial bone rotation on the impostor's mesh.
         // The goal here is to guarantee the impostor boxes all have a rotation that's similar (but not 100% equal) to the one they had when they were created.
         // (i.e. when the impostor boxes are created, in in createColliders(), all boxes are rotated with the y axis up, z to the back, and x to the sides (standard stuff))
