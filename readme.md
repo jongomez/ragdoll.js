@@ -2,6 +2,14 @@
 
 JavaScript class to help create ragdolls for 3D models. Made for BabylonJS. Works with AmmoJS, CannonJS, and OimoJS. OimoJS is recommended, as it supports limits on some joints (like the HingeJoint and PrismaticJoint). Configuring a ragdoll with AmmoJS or CannonJS is probably going to be a bit more difficult.
 
+Live examples:
+
+- [With the dummy model](https://playground.babylonjs.com/#PVKQM1)
+
+- [With the dude model](https://playground.babylonjs.com/#WMJTNK)
+
+- [With the VRoid model (Vita)](https://playground.babylonjs.com/#40AH5S)
+
 There's an example in this repo. The example uses [Character Controller](https://github.com/ssatguru/BabylonJS-CharacterController). You'll need to run a local server to run it. I usually open up a terminal, and type `python3 -m http.server 8000`
 
 # API
